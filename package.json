@@ -5,11 +5,11 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "pnpm build && tsx index.js",
-    "dev": "pnpm build && tsx watch index.js",
-    "test": "tsx --test",
-    "typecheck": "tsc --noEmit",
-    "build": "tsup"
+    "start": "npm run build && tsx index.js",
+    "dev": "npm run build && tsx watch index.js",
+    "test": "noba-node test/*.test.js",
+    "build": "tsup",
+    "test:bare": "noba-bare test/*.test.js"
   },
   "keywords": [
     "bare",
@@ -33,9 +33,16 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/w3c-web-hid": "^1.0.7",
+    "bare": "^1.31.2",
+    "noba": "^1.6.4",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "bare": "1.31.2",
+      "bare-runtime": "1.31.0"
+    }
   }
 }

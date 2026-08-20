@@ -18,8 +18,9 @@ What was deliberately not copied, since it is monorepo tooling:
 - `eslint.config.mjs`, `.prettierrc.js`, `.prettierignore`
 - `tsconfig.prod.json` and the `ldmk-tool` build scripts. Nothing is built here; `tsx` runs
   the TypeScript sources directly.
-- `vitest.config.mjs`, which extends the private `@ledgerhq/vitest-config-dmk`. A standalone
-  config is step 3.
+- `vitest.config.mjs`, which extends the private `@ledgerhq/vitest-config-dmk`. This repo
+  tests with noba, so the vendored `*.test.ts` files still need porting off vitest; they are
+  excluded from `tsconfig.json` until then.
 - `package.json`. This is not a separate package: it has no manifest of its own, and its
   dependencies are installed in the root `package.json`. Upstream resolves them through pnpm
   catalogs and workspace links that do not exist outside the monorepo, so each was pinned to

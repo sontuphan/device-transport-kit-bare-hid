@@ -14,8 +14,9 @@
     "paths": {
       "@tetherto/*": ["./dist/*/index.js"]
     },
-    "types": ["node", "vitest/globals", "w3c-web-hid"],
+    "types": ["node", "w3c-web-hid"],
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

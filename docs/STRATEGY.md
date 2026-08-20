@@ -14,13 +14,13 @@ under `bare` instead of `node`.
 
 ## Upstream
 
-| | |
-| --- | --- |
-| Package | `@ledgerhq/device-transport-kit-node-hid` 1.0.1 |
-| Repo | `LedgerHQ/device-sdk-ts`, `packages/transport/node-hid` |
-| Commit | `e6f7e04910329c7d15d856a6a46546762e22a10a` |
-| Runtime deps | `node-hid`, `usb`, `purify-ts`, `uuid` |
-| Peer deps | `@ledgerhq/device-management-kit@^1.2.0`, `rxjs@7.8.2` |
+|              |                                                         |
+| ------------ | ------------------------------------------------------- |
+| Package      | `@ledgerhq/device-transport-kit-node-hid` 1.0.1         |
+| Repo         | `LedgerHQ/device-sdk-ts`, `packages/transport/node-hid` |
+| Commit       | `e6f7e04910329c7d15d856a6a46546762e22a10a`              |
+| Runtime deps | `node-hid`, `usb`, `purify-ts`, `uuid`                  |
+| Peer deps    | `@ledgerhq/device-management-kit@^1.2.0`, `rxjs@7.8.2`  |
 
 `NodeHidTransport` implements the DMK `Transport` interface (`isSupported`,
 `getIdentifier`, `listenToAvailableDevices`, `startDiscovering`, `stopDiscovering`,
@@ -39,7 +39,7 @@ and deviations in [VENDOR.md](../src/device-transport-kit-node-hid/VENDOR.md).
   [package.json](../package.json), which also guarantees a single DMK copy, as the DI
   container and `instanceof` checks require.
 - Monorepo tooling dropped: eslint, prettier, `ldmk-tool`, and the vitest config extending
-  the private `@ledgerhq/vitest-config-dmk`.
+  the private `@ledgerhq/vitest-config-dmk`. Tests run on noba instead.
 - Upstream's `@api/*` alias rewritten to relative imports, so no `paths` entry is needed.
 
 ## Step 2: build it and consume it (done)
@@ -59,10 +59,15 @@ Note the alias is a tsx/tsc feature, not Node resolution. Plain `node` would nee
 
 Establish the baseline while this is still Node code, so later failures are unambiguous.
 
-- Port the upstream unit tests, already vendored. They use vitest globals (`vi.mock` on
-  `node-hid` and `usb`), so they need a standalone vitest config; the current `test` script
-  runs Node's runner instead and does not pick them up. They must pass with no device
-  attached.
+- Port the upstream unit tests, already vendored, from vitest to
+  [noba](https://github.com/sontuphan/noba), the test framework this repo uses. They lean on
+  vitest globals and `vi.mock` against `node-hid` and `usb`; noba covers the same ground with
+  `describe`/`test`/`assert` plus `noba/mock` (`shallowMock`, `deepMock`) and `noba/spy`.
+  Until they are ported they are excluded from `tsconfig.json` and `pnpm test` cannot run
+  them. They must pass with no device attached.
+- noba is isometric and ships a `noba-bare` binary alongside `noba-node`, so the same suite
+  becomes the step 4 conformance check: green under Node today, green under Bare after the
+  port.
 - Keep the hardware smoke test: discover, connect, read the address, disconnect.
 - Two known rough edges, so they are not mistaken for port regressions: the process does
   not exit after teardown because the HID handle keeps the loop alive, and
@@ -73,14 +78,16 @@ Establish the baseline while this is still Node code, so later failures are unam
 
 Six externals, sorted by how much work Bare makes them:
 
-| Dependency | Used for | Bare status |
-| --- | --- | --- |
-| `node-hid` | every HID read and write | no equivalent, must be written |
-| `usb` | attach and detach events | no equivalent, needs a substitute |
-| `purify-ts` | `Either` / `EitherAsync` results | pure JS, expected to work, unproven |
-| `rxjs` | observables across the DMK | pure JS, expected to work, unproven |
-| `uuid` | device and session ids | needs a crypto source |
-| DMK | the transport interface | bundler only ESM build, must be checked |
+| Dependency  | Used for                         | Bare status                             | Result |
+| ----------- | -------------------------------- | --------------------------------------- | ------ |
+| `node-hid`  | every HID read and write         | no equivalent, must be written          | ⬜     |
+| `usb`       | attach and detach events         | no equivalent, needs a substitute       | ⬜     |
+| `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed   | ✅     |
+| `rxjs`      | observables across the DMK       | pure JS, expected to work, unproven     | ⬜     |
+| `uuid`      | device and session ids           | needs a crypto source                   | ⬜     |
+| DMK         | the transport interface          | bundler only ESM build, must be checked | ⬜     |
+
+✅ proven under Bare 1.31.0 · ⬜ not yet
 
 Two prerequisites gate everything, and neither requires touching the transport.
 
@@ -100,17 +107,36 @@ Hotplug has no obvious home. Upstream gets attach and detach from `usb`, driving
 cannot deliver events, poll enumeration behind the same observable so the transport cannot
 tell the difference.
 
-### 4.2 Prove `purify-ts` runs under Bare
+### 4.2 Prove `purify-ts` runs under Bare (done)
 
-Every result the transport returns is an `Either` or `EitherAsync`, so if it does not run,
-nothing downstream does. It looks safe: 2.1.0 is pure JavaScript, its ESM build references
-no `node:` builtin, no `Buffer`, no `process`, and its only dependency is types only. That
-is not a test.
+Every result the transport returns is an `Either` or `EitherAsync`, so if purify-ts does not
+run, nothing downstream does. Probed in [test/purify-ts.test.js](../test/purify-ts.test.js),
+covering **all 38 exports**: the `Either`/`EitherAsync`/`Maybe` core, `Codec` with all 20
+combinators, and the data structures and helpers (`List`, `NonEmptyList`, `Tuple`,
+`MaybeAsync`, `Order`, `compare`, `orderToNumber`, `identity`, `always`, `curry`).
 
-Import it under `bare`, build an `Either` and an `EitherAsync`, chain and await. Run the
-same probe for `rxjs`, same profile and same blast radius, and settle `uuid`, which needs
-randomness. Minutes of work against weeks of addon work, so do it first. It doubles as a
-test of how Bare handles these packages' export maps.
+**Result: 41 of 41 pass under Bare 1.31.0, and the same 41 under Node.** `purify-ts@2.1.0`
+resolves through its `import` condition unchanged, so no shim or prebundle is needed.
+
+The coverage guard asserts the module's export list matches the list the probes exercise, so
+a purify-ts upgrade that adds an export fails the suite until the new name is covered.
+
+The suite is isometric on purpose: `pnpm test` runs it on Node, `pnpm test:bare` on Bare.
+Two toolchain notes worth keeping:
+
+- noba pins `bare@1.23.5`, older than the `>=1.28.0` its own `bare-fs` requires, so
+  `noba-bare` fails out of the box. Fixed with pnpm `overrides` pinning `bare` and
+  `bare-runtime` to 1.31.x in [package.json](../package.json).
+- The Bare binary ships in an optional platform package whose own dependency
+  (`require-asset`) can be skipped on a normal install, leaving
+  `No binaries found for target`. `pnpm install --force` fixes it.
+
+What this still does not cover: one platform and arch (darwin-arm64) and one Bare version.
+The DMK also inlines its own purify-ts copy into its bundle rather than importing it, so that
+code path is proven only once 4.3 lands.
+
+Still open in this bucket: the same probe for `rxjs`, which has the same profile and blast
+radius, and `uuid`, which needs a randomness source.
 
 ### 4.3 Confirm the DMK loads
 
