@@ -48,7 +48,7 @@ import {
  * surface the transport calls, this covers all 38 exports, and the coverage guard at the
  * bottom fails if an upgrade adds one the probe does not exercise.
  *
- * Isometric on purpose: `pnpm test` runs it on Node, `pnpm test:bare` on Bare.
+ * Runs on Bare only: `pnpm test` is `noba-bare`.
  */
 
 describe('purify-ts: module loading', ({ test }) => {

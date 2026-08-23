@@ -7,9 +7,8 @@
   "scripts": {
     "start": "npm run build && tsx index.js",
     "dev": "npm run build && tsx watch index.js",
-    "test": "noba-node test/*.test.js",
-    "build": "tsup",
-    "test:bare": "noba-bare test/*.test.js"
+    "test": "npm run build && noba-bare test/*.test.js",
+    "build": "tsup"
   },
   "keywords": [
     "bare",
@@ -34,6 +33,8 @@
     "@types/node": "^26.2.0",
     "@types/w3c-web-hid": "^1.0.7",
     "bare": "^1.31.2",
+    "bare-crypto": "^1.15.3",
+    "bare-node-runtime": "^1.5.0",
     "noba": "^1.6.4",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
@@ -43,6 +44,12 @@
     "overrides": {
       "bare": "1.31.2",
       "bare-runtime": "1.31.0"
+    }
+  },
+  "imports": {
+    "@tetherto/uuid": {
+      "bare": "./dist/uuid/bare.js",
+      "default": "./dist/uuid/index.js"
     }
   }
 }

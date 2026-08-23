@@ -65,9 +65,9 @@ Establish the baseline while this is still Node code, so later failures are unam
   `describe`/`test`/`assert` plus `noba/mock` (`shallowMock`, `deepMock`) and `noba/spy`.
   Until they are ported they are excluded from `tsconfig.json` and `pnpm test` cannot run
   them. They must pass with no device attached.
-- noba is isometric and ships a `noba-bare` binary alongside `noba-node`, so the same suite
-  becomes the step 4 conformance check: green under Node today, green under Bare after the
-  port.
+- noba ships a `noba-bare` binary alongside `noba-node`. The dependency probes run on Bare
+  only (`pnpm test` is `noba-bare`), which is what the port cares about; the ported unit tests
+  can run on either.
 - Keep the hardware smoke test: discover, connect, read the address, disconnect.
 - Two known rough edges, so they are not mistaken for port regressions: the process does
   not exit after teardown because the HID handle keeps the loop alive, and
@@ -83,8 +83,8 @@ Six externals, sorted by how much work Bare makes them:
 | `node-hid`  | every HID read and write         | no equivalent, must be written          | ⬜     |
 | `usb`       | attach and detach events         | no equivalent, needs a substitute       | ⬜     |
 | `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed   | ✅     |
-| `rxjs`      | observables across the DMK       | pure JS, expected to work, unproven     | ⬜     |
-| `uuid`      | device and session ids           | needs a crypto source                   | ⬜     |
+| `rxjs`      | observables across the DMK       | runs unchanged, timers and interop included| ✅     |
+| `uuid`      | device and session ids           | needs Bare's import map, wrapped in `@tetherto/uuid` | ✅     |
 | DMK         | the transport interface          | bundler only ESM build, must be checked | ⬜     |
 
 ✅ proven under Bare 1.31.0 · ⬜ not yet
@@ -115,14 +115,13 @@ covering **all 38 exports**: the `Either`/`EitherAsync`/`Maybe` core, `Codec` wi
 combinators, and the data structures and helpers (`List`, `NonEmptyList`, `Tuple`,
 `MaybeAsync`, `Order`, `compare`, `orderToNumber`, `identity`, `always`, `curry`).
 
-**Result: 41 of 41 pass under Bare 1.31.0, and the same 41 under Node.** `purify-ts@2.1.0`
+**Result: 41 of 41 pass under Bare 1.31.0.** `purify-ts@2.1.0`
 resolves through its `import` condition unchanged, so no shim or prebundle is needed.
 
 The coverage guard asserts the module's export list matches the list the probes exercise, so
 a purify-ts upgrade that adds an export fails the suite until the new name is covered.
 
-The suite is isometric on purpose: `pnpm test` runs it on Node, `pnpm test:bare` on Bare.
-Two toolchain notes worth keeping:
+`pnpm test` runs the suite on Bare only, via `noba-bare`. Two toolchain notes worth keeping:
 
 - noba pins `bare@1.23.5`, older than the `>=1.28.0` its own `bare-fs` requires, so
   `noba-bare` fails out of the box. Fixed with pnpm `overrides` pinning `bare` and
@@ -132,11 +131,114 @@ Two toolchain notes worth keeping:
   `No binaries found for target`. `pnpm install --force` fixes it.
 
 What this still does not cover: one platform and arch (darwin-arm64) and one Bare version.
-The DMK also inlines its own purify-ts copy into its bundle rather than importing it, so that
-code path is proven only once 4.3 lands.
 
-Still open in this bucket: the same probe for `rxjs`, which has the same profile and blast
-radius, and `uuid`, which needs a randomness source.
+### 4.2b Prove `rxjs` runs under Bare (done)
+
+Probed in [test/rxjs.test.js](../test/rxjs.test.js). The operator algebra is plain JavaScript
+and was never the risk; the host coupling is. So the probe leans on what Bare actually has to
+provide: timers (`timer`, `interval`, `delay`, `debounceTime`), microtask ordering,
+`Symbol.observable` interop, teardown on unsubscribe, and promise conversion via
+`firstValueFrom` and `lastValueFrom`. It also covers everything the transport imports
+(`BehaviorSubject`, `from`, `map`, `Observable`, `switchMap`) and the `rxjs/operators`
+subpath the DMK requires.
+
+**Result: 25 of 25 pass under Bare 1.31.0.** Bare's timers drive
+rxjs scheduling correctly, including `takeUntil` cancellation and `debounceTime` collapsing a
+burst.
+
+### 4.2c What the DMK actually requires
+
+The DMK does not bundle its dependencies. Its per-file CJS output requires them at runtime,
+which widens 4.3 beyond the DMK's own code:
+
+| Required by the DMK | Call sites | Bare risk |
+| --- | --- | --- |
+| `purify-ts` | 63 | none, proven above |
+| `inversify` | 59 | decorators, `Reflect` metadata, `Proxy` |
+| `rxjs` (plus `rxjs/operators`) | 33 | none, proven above |
+| `xstate` | 21 | unknown, pure JS but large |
+| `semver`, `uuid` | 10 | `uuid` needs randomness |
+| `isomorphic-ws` | 4 | picks a WebSocket per environment, likely wrong under Bare |
+| `reflect-metadata` | 2 | patches a global `Reflect`, must be checked early |
+
+`inversify` with `reflect-metadata` is the one to probe next: it is the DMK's DI container, it
+runs at construction time, and it depends on engine features rather than plain JavaScript.
+`isomorphic-ws` matters only for the parts of the DMK that talk to Ledger's backend, so it may
+be avoidable.
+
+### 4.2d `uuid` needs Bare's import map (done)
+
+The first dependency that does not just work. `uuid@11.0.3` ships separate node and browser
+builds; Bare matches the `node` export condition, and that build's `rng.js` does
+`import 'crypto'`, which Bare cannot resolve:
+
+```
+MODULE_NOT_FOUND: Cannot find module 'crypto' imported from
+  file:///.../node_modules/uuid/dist/esm/rng.js
+```
+
+The fix is one line, no shimming of globals. `bare-node-runtime` publishes an import map that
+points `crypto` at `bare-crypto`, and Bare applies it through an import attribute:
+
+```js
+export * from 'uuid' with { imports: 'bare-node-runtime/imports' }
+```
+
+That is the whole of [src/uuid/bare.js](../src/uuid/bare.js). Node cannot parse that
+attribute, so it gets [src/uuid/index.ts](../src/uuid/index.ts), a plain re-export, and the
+two are selected by condition rather than by a runtime check. Both are shipped through the
+build, and the root [package.json](../package.json) maps them:
+
+```json
+"imports": {
+  "@tetherto/uuid": {
+    "bare": "./dist/uuid/bare.js",
+    "default": "./dist/uuid/index.js"
+  }
+}
+```
+
+Callers write `import { v4 } from '@tetherto/uuid'` and never branch on the runtime.
+[tsconfig.json](../tsconfig.json) reaches the same files through its existing
+`"@tetherto/*": ["./dist/*"]` wildcard, so tsc, tsx, and esbuild need no per package entry.
+The wildcard targets the directory, not `index.js`: pointed at the `.js` it resolves but
+carries no types, and a TypeScript importer fails with `TS7016`.
+
+Both entries are needed, and neither substitutes for the other. A `paths` alias alone fails
+under Bare, which never reads tsconfig (`MODULE_NOT_FOUND`, tested). The `imports` entry alone
+fails under tsc. The key also omits the leading `#` that Node's resolution spec requires:
+Bare is lenient and resolves it, plain Node ignores the key entirely. A deliberate trade,
+since the suite runs on Bare only.
+
+**esbuild strips import attributes.** Built through tsup, `bare.js` comes out as a plain
+`export * from "uuid"`, the map is gone, and Bare is back to `MODULE_NOT_FOUND`. Since the
+file needs no compiling, [tsup.config.ts](../tsup.config.ts) copies it verbatim in `onSuccess`
+instead of treating it as an entry. Anything else that relies on an import attribute will hit
+the same wall, which matters for 4.3 if the DMK ends up loaded that way.
+
+Because the mapping now points into `dist`, `pnpm test` builds first.
+
+Probed in [test/uuid.test.js](../test/uuid.test.js): **12 of 12 pass under Bare 1.31.0**, covering all 14 exports, `v3` and `v5` included, which means `bare-crypto` also
+satisfies uuid's md5 and sha1 paths.
+
+Three findings worth carrying into 4.3:
+
+- **The map propagates through the subgraph, including CJS.** A fixture that does
+  `require("uuid")` resolves correctly when imported with the attribute, which is exactly the
+  shape of the DMK's own per-file CJS output. So the DMK's 4 `require("uuid")` call sites do
+  not each need patching; importing the DMK with the attribute should cover them.
+- **Order matters, and failure is sticky.** A failed plain `import('uuid')` poisons Bare's
+  module cache for that graph, and every later mapped import of it fails too. Load the mapped
+  copy first. Load it early enough and later plain imports resolve from cache, mapped.
+- **`bare-node-runtime/global` is not needed for this.** It patches globals; the resolution
+  fix comes entirely from the import map. Tested separately: global alone still fails.
+- **A tsup caveat for later.** Nothing imports `@tetherto/uuid` from `src/` yet. When the
+  transport does, the bundle must keep it external, or esbuild will inline the `default`
+  branch and the condition will never be evaluated at runtime.
+
+An alternative, if the goal is one less dependency: `bare-crypto` exposes `randomUUID()`,
+which returns a valid v4, and the transport calls `v4()` exactly once. That does not help the
+DMK's copy, so the import map is needed either way.
 
 ### 4.3 Confirm the DMK loads
 
