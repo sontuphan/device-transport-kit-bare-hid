@@ -13,7 +13,11 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  // esbuild strips import attributes, which would drop the `with { imports: ... }` that makes
-  // uuid resolve under Bare. bare.js needs no compiling, so copy it through verbatim.
+  // Keep the wrapper external. Bundled, esbuild would inline its `default` branch and the
+  // `bare` condition would never be evaluated at runtime.
+  external: ['@tetherto/uuid'],
+  // esbuild preserves `with { imports: ... }`, but not under `target: 'node20'`, which
+  // predates import attributes and drops them silently. bare.js needs no compiling, so copy
+  // it through verbatim rather than building it.
   onSuccess: 'cp src/uuid/bare.js dist/uuid/bare.js',
 })

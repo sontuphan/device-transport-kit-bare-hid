@@ -1,6 +1,5 @@
 import { describe } from 'noba'
-import * as uuid from '@tetherto/uuid'
-import * as fixture from './fixtures/needs-uuid.cjs' with { imports: 'bare-node-runtime/imports' }
+import * as uuid from 'uuid' with { imports: 'bare-node-runtime/imports' }
 
 /**
  * Bare compatibility probe for uuid.
@@ -10,19 +9,16 @@ import * as fixture from './fixtures/needs-uuid.cjs' with { imports: 'bare-node-
  * builds, Bare matches the node condition, and that build's rng.js imports a bare `crypto`
  * specifier that Bare cannot resolve.
  *
- * src/uuid absorbs that difference behind the `@tetherto/uuid` subpath import, so nothing downstream
- * branches on the runtime: Bare gets src/uuid/bare.js, which re-exports uuid under
- * Bare's import map, and everything else gets src/uuid/index.ts, a plain re-export.
+ * Bare's import map fixes it, applied as an import attribute at the top of this file. That
+ * attribute is Bare only, since Node rejects it with ERR_IMPORT_ATTRIBUTE_UNSUPPORTED, which
+ * is fine here because the suite runs on Bare alone (`pnpm test` is `noba-bare`).
  *
  * One ordering rule worth knowing: a failed plain `import('uuid')` poisons Bare's module
- * cache for that graph, and every later mapped import of it fails too. Importing `#uuid`
- * first, as this file does, keeps the mapped copy in the cache.
- *
- * Runs on Bare only: `pnpm test` is `noba-bare`. The Node branch of `@tetherto/uuid` still
- * exists for tsc and tsx, but nothing exercises it.
+ * cache for that graph, and every later mapped import of it fails too. The mapped import at
+ * the top of this file runs first, so the cache holds the working copy.
  */
 describe('uuid: module loading', ({ test }) => {
-  test('#uuid loads with all 14 exports on either runtime', ({ assert }) => {
+  test('the mapped import loads with all 14 exports', ({ assert }) => {
     assert.equal(Object.keys(uuid).length, 14)
     assert.equal(typeof uuid.v4, 'function')
   })
@@ -33,8 +29,12 @@ describe('uuid: module loading', ({ test }) => {
     assert.isTrue(plain.validate(plain.v4()))
   })
 
-  test('the map reaches a CJS subgraph, as the DMK needs', ({ assert }) => {
-    assert.isTrue(uuid.validate(fixture.default.id()))
+  test('@tetherto/uuid resolves to the same thing, as src imports it', async ({
+    assert,
+  }) => {
+    const wrapper = await import('@tetherto/uuid')
+    assert.equal(typeof wrapper.v4, 'function')
+    assert.isTrue(uuid.validate(wrapper.v4()))
   })
 })
 

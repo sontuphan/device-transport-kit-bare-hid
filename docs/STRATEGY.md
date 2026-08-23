@@ -78,14 +78,14 @@ Establish the baseline while this is still Node code, so later failures are unam
 
 Six externals, sorted by how much work Bare makes them:
 
-| Dependency  | Used for                         | Bare status                             | Result |
-| ----------- | -------------------------------- | --------------------------------------- | ------ |
-| `node-hid`  | every HID read and write         | no equivalent, must be written          | ⬜     |
-| `usb`       | attach and detach events         | no equivalent, needs a substitute       | ⬜     |
-| `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed   | ✅     |
-| `rxjs`      | observables across the DMK       | runs unchanged, timers and interop included| ✅     |
+| Dependency  | Used for                         | Bare status                                          | Result |
+| ----------- | -------------------------------- | ---------------------------------------------------- | ------ |
+| `node-hid`  | every HID read and write         | no equivalent, must be written                       | ⬜     |
+| `usb`       | attach and detach events         | no equivalent, needs a substitute                    | ⬜     |
+| `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed                | ✅     |
+| `rxjs`      | observables across the DMK       | runs unchanged, timers and interop included          | ✅     |
 | `uuid`      | device and session ids           | needs Bare's import map, wrapped in `@tetherto/uuid` | ✅     |
-| DMK         | the transport interface          | bundler only ESM build, must be checked | ⬜     |
+| DMK         | the transport interface          | loads and constructs, recipe in 4.3 not landed         | ✅     |
 
 ✅ proven under Bare 1.31.0 · ⬜ not yet
 
@@ -151,15 +151,15 @@ burst.
 The DMK does not bundle its dependencies. Its per-file CJS output requires them at runtime,
 which widens 4.3 beyond the DMK's own code:
 
-| Required by the DMK | Call sites | Bare risk |
-| --- | --- | --- |
-| `purify-ts` | 63 | none, proven above |
-| `inversify` | 59 | decorators, `Reflect` metadata, `Proxy` |
-| `rxjs` (plus `rxjs/operators`) | 33 | none, proven above |
-| `xstate` | 21 | unknown, pure JS but large |
-| `semver`, `uuid` | 10 | `uuid` needs randomness |
-| `isomorphic-ws` | 4 | picks a WebSocket per environment, likely wrong under Bare |
-| `reflect-metadata` | 2 | patches a global `Reflect`, must be checked early |
+| Required by the DMK            | Call sites | Bare risk                                                  |
+| ------------------------------ | ---------- | ---------------------------------------------------------- |
+| `purify-ts`                    | 63         | none, proven above                                         |
+| `inversify`                    | 59         | decorators, `Reflect` metadata, `Proxy`                    |
+| `rxjs` (plus `rxjs/operators`) | 33         | none, proven above                                         |
+| `xstate`                       | 21         | unknown, pure JS but large                                 |
+| `semver`, `uuid`               | 10         | `uuid` needs randomness                                    |
+| `isomorphic-ws`                | 4          | picks a WebSocket per environment, likely wrong under Bare |
+| `reflect-metadata`             | 2          | patches a global `Reflect`, must be checked early          |
 
 `inversify` with `reflect-metadata` is the one to probe next: it is the DMK's DI container, it
 runs at construction time, and it depends on engine features rather than plain JavaScript.
@@ -210,11 +210,16 @@ fails under tsc. The key also omits the leading `#` that Node's resolution spec 
 Bare is lenient and resolves it, plain Node ignores the key entirely. A deliberate trade,
 since the suite runs on Bare only.
 
-**esbuild strips import attributes.** Built through tsup, `bare.js` comes out as a plain
-`export * from "uuid"`, the map is gone, and Bare is back to `MODULE_NOT_FOUND`. Since the
-file needs no compiling, [tsup.config.ts](../tsup.config.ts) copies it verbatim in `onSuccess`
-instead of treating it as an entry. Anything else that relies on an import attribute will hit
-the same wall, which matters for 4.3 if the DMK ends up loaded that way.
+**Import attributes and build targets.** esbuild preserves `with { imports: ... }`, but only
+when the target supports it. [tsup.config.ts](../tsup.config.ts) sets `target: 'node20'`,
+which predates import attributes, so esbuild silently drops them and Bare is back to
+`MODULE_NOT_FOUND`. Since `bare.js` needs no compiling, it is copied through verbatim in
+`onSuccess` rather than built.
+
+**Node rejects the attribute outright**, with `ERR_IMPORT_ATTRIBUTE_UNSUPPORTED`, on both
+`node` and `tsx`. So an attribute written inline in shared source makes that file Bare only.
+Keeping it in `bare.js`, behind the `bare` condition, is what lets the same tree run on both.
+Test files are free to use the attribute inline, since the suite runs on Bare alone.
 
 Because the mapping now points into `dist`, `pnpm test` builds first.
 
@@ -232,20 +237,46 @@ Three findings worth carrying into 4.3:
   copy first. Load it early enough and later plain imports resolve from cache, mapped.
 - **`bare-node-runtime/global` is not needed for this.** It patches globals; the resolution
   fix comes entirely from the import map. Tested separately: global alone still fails.
-- **A tsup caveat for later.** Nothing imports `@tetherto/uuid` from `src/` yet. When the
-  transport does, the bundle must keep it external, or esbuild will inline the `default`
-  branch and the condition will never be evaluated at runtime.
+- **The transport now imports it.** `NodeHidTransport.ts` takes `v4` from `@tetherto/uuid`
+  instead of `uuid`, and [tsup.config.ts](../tsup.config.ts) lists the wrapper in `external`.
+  Without that, esbuild inlines the `default` branch into the bundle and the `bare` condition
+  is never evaluated at runtime. Verified: both `dist` formats keep the bare specifier.
 
 An alternative, if the goal is one less dependency: `bare-crypto` exposes `randomUUID()`,
 which returns a valid v4, and the transport calls `v4()` exactly once. That does not help the
 DMK's copy, so the import map is needed either way.
 
-### 4.3 Confirm the DMK loads
+### 4.3 The DMK loads and constructs under Bare (proven, not landed)
 
-Bare resolves ESM strictly like Node, so the DMK's bundler only ESM build
-(`export * from "./src"`) should fail there exactly as it fails under `node` today.
-Establish whether Bare picks the `require` condition and lands on the working CJS build, or
-whether the DMK must be prebundled. Go or no go for the whole port; do it alongside 4.2.
+The go or no go item, and it is a go. Established by hand, not committed: the wrapper and
+tests written to prove it were reverted as out of scope, so the recipe is recorded here.
+
+Two separate problems:
+
+1. **Resolution.** The DMK's ESM build is bundler only (`export * from "./src"`) and its
+   package declares no `"type": "module"`, so Bare parses those files as CommonJS and throws
+   `Unexpected token 'export'`. Its CJS build is fine, but the package exports no subpath, so
+   it has to be reached by path: `lib/cjs/index.js`.
+2. **Environment.** That build pulls in `inversify`, `xstate`, `ws`, and `reflect-metadata`,
+   which want Node builtins (`events`, `util`) and globals (`process`). Both halves of
+   `bare-node-runtime` are needed here, unlike uuid, where the import map alone sufficed.
+
+```js
+import 'bare-node-runtime/global'
+
+export * from '<path to>/@ledgerhq/device-management-kit/lib/cjs/index.js' with { imports: 'bare-node-runtime/imports' }
+```
+
+With that, the DMK exposes all 135 exports under Bare 1.31.0, and
+`new DeviceManagementKitBuilder().addTransport(stub).build()` produces a working kit. The
+builder is the meaningful half: it runs inversify's DI container, which leans on decorators
+and Reflect metadata, and wires the xstate machines. So `inversify`, `xstate`, and
+`reflect-metadata` are all covered by that one construction, and need no probes of their own.
+The builder also accepts a plain JavaScript stub transport, which is the shape `bare-hid` will
+take. Note it rejects a kit with no transport at all (`NoTransportProvidedError`).
+
+What this does not prove: no APDU has crossed a wire under Bare. This is construction and
+wiring only. The first real exchange waits on 4.1.
 
 ### 4.4 Port the transport
 
