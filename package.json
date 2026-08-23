@@ -50,6 +50,7 @@
     "@tetherto/uuid": {
       "bare": "./dist/uuid/bare.js",
       "default": "./dist/uuid/index.js"
-    }
+    },
+    "~/*": "./node_modules/*"
   }
 }

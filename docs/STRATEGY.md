@@ -85,7 +85,7 @@ Six externals, sorted by how much work Bare makes them:
 | `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed                | ✅     |
 | `rxjs`      | observables across the DMK       | runs unchanged, timers and interop included          | ✅     |
 | `uuid`      | device and session ids           | needs Bare's import map, wrapped in `@tetherto/uuid` | ✅     |
-| DMK         | the transport interface          | loads and constructs, recipe in 4.3 not landed         | ✅     |
+| DMK         | the transport interface          | loads and constructs, plus APDU primitives           | ✅     |
 
 ✅ proven under Bare 1.31.0 · ⬜ not yet
 
@@ -246,12 +246,9 @@ An alternative, if the goal is one less dependency: `bare-crypto` exposes `rando
 which returns a valid v4, and the transport calls `v4()` exactly once. That does not help the
 DMK's copy, so the import map is needed either way.
 
-### 4.3 The DMK loads and constructs under Bare (proven, not landed)
+### 4.3 The DMK loads and constructs under Bare (done)
 
-The go or no go item, and it is a go. Established by hand, not committed: the wrapper and
-tests written to prove it were reverted as out of scope, so the recipe is recorded here.
-
-Two separate problems:
+The go or no go item, and it is a go. Two separate problems:
 
 1. **Resolution.** The DMK's ESM build is bundler only (`export * from "./src"`) and its
    package declares no `"type": "module"`, so Bare parses those files as CommonJS and throws
@@ -261,22 +258,35 @@ Two separate problems:
    which want Node builtins (`events`, `util`) and globals (`process`). Both halves of
    `bare-node-runtime` are needed here, unlike uuid, where the import map alone sufficed.
 
+Six lines at the top of [test/dmk.test.js](../test/dmk.test.js):
+
 ```js
 import 'bare-node-runtime/global'
-
-export * from '<path to>/@ledgerhq/device-management-kit/lib/cjs/index.js' with { imports: 'bare-node-runtime/imports' }
+import * as dmk from '<path>/@ledgerhq/device-management-kit/lib/cjs/index.js' with {
+  imports: 'bare-node-runtime/imports',
+}
 ```
 
-With that, the DMK exposes all 135 exports under Bare 1.31.0, and
-`new DeviceManagementKitBuilder().addTransport(stub).build()` produces a working kit. The
-builder is the meaningful half: it runs inversify's DI container, which leans on decorators
-and Reflect metadata, and wires the xstate machines. So `inversify`, `xstate`, and
-`reflect-metadata` are all covered by that one construction, and need no probes of their own.
-The builder also accepts a plain JavaScript stub transport, which is the shape `bare-hid` will
-take. Note it rejects a kit with no transport at all (`NoTransportProvidedError`).
+**Result: 6 of 6 pass under Bare 1.31.0.** The package exposes 136 exports, every symbol the
+transport imports is present (`DeviceConnectionStateMachine`, `TransportConnectedDevice`,
+`GeneralDmkError`, `DeviceActionStatus`, `LEDGER_VENDOR_ID`), and
+`new DeviceManagementKitBuilder().addTransport(stub).build()` produces a working kit.
 
-What this does not prove: no APDU has crossed a wire under Bare. This is construction and
-wiring only. The first real exchange waits on 4.1.
+Construction is the meaningful half. It runs inversify's DI container, which leans on
+decorators and Reflect metadata, and wires the xstate machines, so `inversify`, `xstate`, and
+`reflect-metadata` are covered by that one test and need no probes of their own. The builder
+also accepts a plain JavaScript stub transport, which is the shape `bare-hid` will take. A kit
+with no transport builds fine and fails later on use, with `NoTransportProvidedError`.
+
+The APDU primitives are covered too, since they are the layer the transport hands frames to:
+`ApduBuilder`, `ApduParser`, `ApduResponse`, and `CommandUtils` round trip correctly on
+`Uint8Array` under Bare.
+
+What this does not prove: no APDU has crossed a wire. This is construction and wiring only.
+The first real exchange waits on 4.1.
+
+Nothing about this landed in `src/`. The transport still imports the DMK by package name, and
+whether the port ships a wrapper or resolves this another way is a 4.4 decision.
 
 ### 4.4 Port the transport
 
