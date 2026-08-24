@@ -48,7 +48,7 @@ import {
  * surface the transport calls, this covers all 38 exports, and the coverage guard at the
  * bottom fails if an upgrade adds one the probe does not exercise.
  *
- * Runs on Bare only: `pnpm test` is `noba-bare`.
+ * Runs on Bare only: `npm test` runs `noba-bare`.
  */
 
 describe('purify-ts: module loading', ({ test }) => {

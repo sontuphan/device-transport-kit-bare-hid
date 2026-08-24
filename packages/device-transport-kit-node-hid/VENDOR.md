@@ -21,10 +21,9 @@ What was deliberately not copied, since it is monorepo tooling:
 - `vitest.config.mjs`, which extends the private `@ledgerhq/vitest-config-dmk`. This repo
   tests with noba, so the vendored `*.test.ts` files still need porting off vitest; they are
   excluded from `tsconfig.json` until then.
-- `package.json`. This is not a separate package: it has no manifest of its own, and its
-  dependencies are installed in the root `package.json`. Upstream resolves them through pnpm
-  catalogs and workspace links that do not exist outside the monorepo, so each was pinned to
-  the version the catalog resolved to:
+- `package.json`. This package has its own manifest, but written from scratch rather than
+  copied: upstream resolves dependencies through pnpm catalogs and workspace links that do not
+  exist outside that monorepo, so each was pinned to the version the catalog resolved to:
 
 | Dependency  | Upstream   | Here      |
 | ----------- | ---------- | --------- |
@@ -41,5 +40,5 @@ Two edits to `src/`, both mechanical to reapply after a rebase:
    without any tsconfig `paths` entry.
 2. `NodeHidTransport.ts` imports `v4` from `@tetherto/uuid` rather than `uuid`. That wrapper
    picks uuid's Bare safe build under Bare and the plain one elsewhere; see
-   [../../docs/STRATEGY.md](../../docs/STRATEGY.md) section 4.2d. `tsup` keeps it external,
+   [../../docs/STRATEGY.md](../../docs/STRATEGY.md) section 4.2d. its own `tsup.config.ts` keeps it external,
    otherwise the bundle inlines the non Bare branch.

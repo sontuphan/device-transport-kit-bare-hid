@@ -11,7 +11,7 @@ import * as uuid from 'uuid' with { imports: 'bare-node-runtime/imports' }
  *
  * Bare's import map fixes it, applied as an import attribute at the top of this file. That
  * attribute is Bare only, since Node rejects it with ERR_IMPORT_ATTRIBUTE_UNSUPPORTED, which
- * is fine here because the suite runs on Bare alone (`pnpm test` is `noba-bare`).
+ * is fine here because the suite runs on Bare alone (`npm test` runs `noba-bare`).
  *
  * One ordering rule worth knowing: a failed plain `import('uuid')` poisons Bare's module
  * cache for that graph, and every later mapped import of it fails too. The mapped import at

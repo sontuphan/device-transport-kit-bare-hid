@@ -1,0 +1,31 @@
+{
+  "name": "@tetherto/uuid",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bare": "./dist/bare.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "noba-bare test/*.test.js"
+  },
+  "dependencies": {
+    "uuid": "11.0.3"
+  },
+  "devDependencies": {
+    "bare-crypto": "^1.15.3",
+    "bare-node-runtime": "^1.5.0",
+    "noba": "^1.6.4",
+    "tsup": "^8.5.1"
+  }
+}

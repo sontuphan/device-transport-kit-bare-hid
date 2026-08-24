@@ -4,11 +4,14 @@
   "description": "",
   "type": "module",
   "main": "index.js",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "start": "npm run build && tsx index.js",
     "dev": "npm run build && tsx watch index.js",
-    "test": "npm run build && noba-bare test/*.test.js",
-    "build": "tsup"
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
   },
   "keywords": [
     "bare",
@@ -17,40 +20,24 @@
   "author": "Tu Phan <tu.phan@tether.io>",
   "license": "MIT",
   "files": [
-    "index.js",
-    "src"
+    "index.js"
   ],
   "dependencies": {
     "@ledgerhq/device-management-kit": "^1.8.0",
     "@ledgerhq/device-signer-kit-ethereum": "^1.16.0",
-    "node-hid": "^3.4.0",
-    "purify-ts": "2.1.0",
-    "rxjs": "^7.8.2",
-    "usb": "^2.18.0"
+    "@tetherto/device-transport-kit-node-hid": "*",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/w3c-web-hid": "^1.0.7",
     "bare": "^1.31.2",
-    "bare-crypto": "^1.15.3",
-    "bare-node-runtime": "^1.5.0",
-    "noba": "^1.6.4",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
-    "typescript": "^5.9.3",
-    "uuid": "11.0.3"
+    "typescript": "^5.9.3"
   },
-  "pnpm": {
-    "overrides": {
-      "bare": "1.31.2",
-      "bare-runtime": "1.31.0"
-    }
-  },
-  "imports": {
-    "@tetherto/uuid": {
-      "bare": "./dist/uuid/bare.js",
-      "default": "./dist/uuid/index.js"
-    },
-    "~/*": "./node_modules/*"
+  "overrides": {
+    "bare": "$bare",
+    "bare-runtime": "1.31.0"
   }
 }

@@ -17,7 +17,7 @@ import * as dmk from '~/@ledgerhq/device-management-kit/lib/cjs/index.js' with {
  * bare-hid buys nothing. It also stands in for the DMK's own dependencies, which are not
  * probed separately, because constructing a kit exercises all of them.
  *
- * Runs on Bare only: `pnpm test` is `noba-bare`. Node rejects the import attribute above
+ * Runs on Bare only: `npm test` runs `noba-bare`. Node rejects the import attribute above
  * with ERR_IMPORT_ATTRIBUTE_UNSUPPORTED.
  */
 describe('DMK: module loading', ({ test }) => {

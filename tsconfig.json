@@ -11,12 +11,9 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "paths": {
-      "@tetherto/*": ["./dist/*"]
-    },
     "types": ["node", "w3c-web-hid"],
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "include": ["packages/*/**/*.ts"],
+  "exclude": ["packages/**/*.test.ts"]
 }

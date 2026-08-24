@@ -1,0 +1,43 @@
+{
+  "name": "@tetherto/device-transport-kit-node-hid",
+  "version": "1.0.1",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "noba-bare test/*.test.js"
+  },
+  "dependencies": {
+    "@tetherto/uuid": "*",
+    "node-hid": "^3.2.0",
+    "purify-ts": "2.1.0",
+    "usb": "^2.16.0"
+  },
+  "devDependencies": {
+    "@ledgerhq/device-management-kit": "^1.8.0",
+    "bare-node-runtime": "^1.5.0",
+    "noba": "^1.6.4",
+    "rxjs": "7.8.2",
+    "tsup": "^8.5.1"
+  },
+  "peerDependencies": {
+    "@ledgerhq/device-management-kit": "^1.2.0",
+    "rxjs": "7.8.2"
+  },
+  "imports": {
+    "~/*": "../../node_modules/*"
+  }
+}

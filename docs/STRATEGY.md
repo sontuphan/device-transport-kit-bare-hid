@@ -30,8 +30,8 @@ essentially all runtime coupling.
 
 ## Step 1: vendor the source (done)
 
-In [src/device-transport-kit-node-hid/](../src/device-transport-kit-node-hid/); provenance
-and deviations in [VENDOR.md](../src/device-transport-kit-node-hid/VENDOR.md).
+In [packages/device-transport-kit-node-hid/](../packages/device-transport-kit-node-hid/); provenance
+and deviations in [VENDOR.md](../packages/device-transport-kit-node-hid/VENDOR.md).
 
 - TypeScript kept, for diffability against upstream. `src/` is TypeScript, `index.js` stays
   JavaScript.
@@ -63,10 +63,10 @@ Establish the baseline while this is still Node code, so later failures are unam
   [noba](https://github.com/sontuphan/noba), the test framework this repo uses. They lean on
   vitest globals and `vi.mock` against `node-hid` and `usb`; noba covers the same ground with
   `describe`/`test`/`assert` plus `noba/mock` (`shallowMock`, `deepMock`) and `noba/spy`.
-  Until they are ported they are excluded from `tsconfig.json` and `pnpm test` cannot run
+  Until they are ported they are excluded from `tsconfig.json` and `npm test` cannot run
   them. They must pass with no device attached.
 - noba ships a `noba-bare` binary alongside `noba-node`. The dependency probes run on Bare
-  only (`pnpm test` is `noba-bare`), which is what the port cares about; the ported unit tests
+  only (`npm test` runs `noba-bare`), which is what the port cares about; the ported unit tests
   can run on either.
 - Keep the hardware smoke test: discover, connect, read the address, disconnect.
 - Two known rough edges, so they are not mistaken for port regressions: the process does
@@ -110,7 +110,7 @@ tell the difference.
 ### 4.2 Prove `purify-ts` runs under Bare (done)
 
 Every result the transport returns is an `Either` or `EitherAsync`, so if purify-ts does not
-run, nothing downstream does. Probed in [test/purify-ts.test.js](../test/purify-ts.test.js),
+run, nothing downstream does. Probed in [packages/device-transport-kit-node-hid/test/purify-ts.test.js](../packages/device-transport-kit-node-hid/test/purify-ts.test.js),
 covering **all 38 exports**: the `Either`/`EitherAsync`/`Maybe` core, `Codec` with all 20
 combinators, and the data structures and helpers (`List`, `NonEmptyList`, `Tuple`,
 `MaybeAsync`, `Order`, `compare`, `orderToNumber`, `identity`, `always`, `curry`).
@@ -121,20 +121,27 @@ resolves through its `import` condition unchanged, so no shim or prebundle is ne
 The coverage guard asserts the module's export list matches the list the probes exercise, so
 a purify-ts upgrade that adds an export fails the suite until the new name is covered.
 
-`pnpm test` runs the suite on Bare only, via `noba-bare`. Two toolchain notes worth keeping:
+`npm test` fans out to each package's own suite (`npm run test --workspaces`), all on Bare via
+`noba-bare`. Three toolchain notes worth keeping:
 
 - noba pins `bare@1.23.5`, older than the `>=1.28.0` its own `bare-fs` requires, so
-  `noba-bare` fails out of the box. Fixed with pnpm `overrides` pinning `bare` and
-  `bare-runtime` to 1.31.x in [package.json](../package.json).
-- The Bare binary ships in an optional platform package whose own dependency
-  (`require-asset`) can be skipped on a normal install, leaving
-  `No binaries found for target`. `pnpm install --force` fixes it.
+  `noba-bare` fails out of the box. Fixed with npm `overrides` in
+  [package.json](../package.json), pinning `bare-runtime` to 1.31.0 and `bare` to `$bare`,
+  the reference form npm requires when an override touches a direct dependency.
+- The Bare binary ships in an optional platform package (`bare-runtime-<platform>-<arch>`)
+  whose own dependency, `require-asset`, can go missing on a partial install, leaving
+  `No binaries found for target`. A clean reinstall fixes it.
+- An import map's targets are resolved from the **mapped package's** location, not the
+  importer's. `bare-crypto` therefore has to be visible from `node_modules/uuid`, which npm's
+  hoisting gives for free but a nested layout does not. If a version conflict ever pushes
+  `bare-crypto` down into `packages/uuid/node_modules`, the map breaks, and the symptom is
+  misleading: `Cannot find module 'crypto'` rather than `bare-crypto`.
 
 What this still does not cover: one platform and arch (darwin-arm64) and one Bare version.
 
 ### 4.2b Prove `rxjs` runs under Bare (done)
 
-Probed in [test/rxjs.test.js](../test/rxjs.test.js). The operator algebra is plain JavaScript
+Probed in [packages/device-transport-kit-node-hid/test/rxjs.test.js](../packages/device-transport-kit-node-hid/test/rxjs.test.js). The operator algebra is plain JavaScript
 and was never the risk; the host coupling is. So the probe leans on what Bare actually has to
 provide: timers (`timer`, `interval`, `delay`, `debounceTime`), microtask ordering,
 `Symbol.observable` interop, teardown on unsubscribe, and promise conversion via
@@ -184,8 +191,8 @@ points `crypto` at `bare-crypto`, and Bare applies it through an import attribut
 export * from 'uuid' with { imports: 'bare-node-runtime/imports' }
 ```
 
-That is the whole of [src/uuid/bare.js](../src/uuid/bare.js). Node cannot parse that
-attribute, so it gets [src/uuid/index.ts](../src/uuid/index.ts), a plain re-export, and the
+That is the whole of [packages/uuid/bare.js](../packages/uuid/bare.js). Node cannot parse that
+attribute, so it gets [packages/uuid/index.ts](../packages/uuid/index.ts), a plain re-export, and the
 two are selected by condition rather than by a runtime check. Both are shipped through the
 build, and the root [package.json](../package.json) maps them:
 
@@ -198,32 +205,11 @@ build, and the root [package.json](../package.json) maps them:
 }
 ```
 
-Callers write `import { v4 } from '@tetherto/uuid'` and never branch on the runtime.
-[tsconfig.json](../tsconfig.json) reaches the same files through its existing
-`"@tetherto/*": ["./dist/*"]` wildcard, so tsc, tsx, and esbuild need no per package entry.
-The wildcard targets the directory, not `index.js`: pointed at the `.js` it resolves but
-carries no types, and a TypeScript importer fails with `TS7016`.
+Callers write `import { v4 } from '@tetherto/uuid'` and never branch on the runtime. It is a
+workspace package now, so the switch lives in its own `exports` map rather than in the root
+manifest, and npm links it into `node_modules` where Bare, tsc, and tsx all find it.
 
-Both entries are needed, and neither substitutes for the other. A `paths` alias alone fails
-under Bare, which never reads tsconfig (`MODULE_NOT_FOUND`, tested). The `imports` entry alone
-fails under tsc. The key also omits the leading `#` that Node's resolution spec requires:
-Bare is lenient and resolves it, plain Node ignores the key entirely. A deliberate trade,
-since the suite runs on Bare only.
-
-**Import attributes and build targets.** esbuild preserves `with { imports: ... }`, but only
-when the target supports it. [tsup.config.ts](../tsup.config.ts) sets `target: 'node20'`,
-which predates import attributes, so esbuild silently drops them and Bare is back to
-`MODULE_NOT_FOUND`. Since `bare.js` needs no compiling, it is copied through verbatim in
-`onSuccess` rather than built.
-
-**Node rejects the attribute outright**, with `ERR_IMPORT_ATTRIBUTE_UNSUPPORTED`, on both
-`node` and `tsx`. So an attribute written inline in shared source makes that file Bare only.
-Keeping it in `bare.js`, behind the `bare` condition, is what lets the same tree run on both.
-Test files are free to use the attribute inline, since the suite runs on Bare alone.
-
-Because the mapping now points into `dist`, `pnpm test` builds first.
-
-Probed in [test/uuid.test.js](../test/uuid.test.js): **12 of 12 pass under Bare 1.31.0**, covering all 14 exports, `v3` and `v5` included, which means `bare-crypto` also
+Probed in [packages/uuid/test/uuid.test.js](../packages/uuid/test/uuid.test.js): **12 of 12 pass under Bare 1.31.0**, covering all 14 exports, `v3` and `v5` included, which means `bare-crypto` also
 satisfies uuid's md5 and sha1 paths.
 
 Three findings worth carrying into 4.3:
@@ -258,7 +244,7 @@ The go or no go item, and it is a go. Two separate problems:
    which want Node builtins (`events`, `util`) and globals (`process`). Both halves of
    `bare-node-runtime` are needed here, unlike uuid, where the import map alone sufficed.
 
-Six lines at the top of [test/dmk.test.js](../test/dmk.test.js):
+Six lines at the top of [packages/device-transport-kit-node-hid/test/dmk.test.js](../packages/device-transport-kit-node-hid/test/dmk.test.js):
 
 ```js
 import 'bare-node-runtime/global'

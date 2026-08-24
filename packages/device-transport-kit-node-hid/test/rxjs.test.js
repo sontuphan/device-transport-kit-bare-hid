@@ -41,7 +41,7 @@ import {
  * microtask scheduling, Symbol.observable, and teardown on unsubscribe. Those get the most
  * attention below.
  *
- * Runs on Bare only: `pnpm test` is `noba-bare`.
+ * Runs on Bare only: `npm test` runs `noba-bare`.
  */
 describe('rxjs: module loading', ({ test }) => {
   test('the package and its operators subpath both resolve', async ({ assert }) => {
