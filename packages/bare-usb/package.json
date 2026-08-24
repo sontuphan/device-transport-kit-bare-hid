@@ -1,0 +1,29 @@
+{
+  "name": "@tetherto/bare-usb",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bare": "./dist/bare.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "postinstall": "node scripts/link-addon.js",
+    "build": "tsup",
+    "test": "noba-bare test/*.test.js"
+  },
+  "dependencies": {
+    "usb": "^2.16.0"
+  },
+  "devDependencies": {
+    "bare-node-runtime": "^1.5.0",
+    "noba": "^1.6.4",
+    "tsup": "^8.5.1"
+  }
+}

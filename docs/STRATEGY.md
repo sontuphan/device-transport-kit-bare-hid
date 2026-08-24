@@ -80,32 +80,73 @@ Six externals, sorted by how much work Bare makes them:
 
 | Dependency  | Used for                         | Bare status                                          | Result |
 | ----------- | -------------------------------- | ---------------------------------------------------- | ------ |
-| `node-hid`  | every HID read and write         | no equivalent, must be written                       | ⬜     |
-| `usb`       | attach and detach events         | no equivalent, needs a substitute                    | ⬜     |
+| `node-hid`  | every HID read and write         | enumerates and writes, reads come back zeroed                       | ❌     |
+| `usb`       | attach and detach events         | runs unchanged, via `@tetherto/bare-usb`                    | ✅     |
 | `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed                | ✅     |
 | `rxjs`      | observables across the DMK       | runs unchanged, timers and interop included          | ✅     |
 | `uuid`      | device and session ids           | needs Bare's import map, wrapped in `@tetherto/uuid` | ✅     |
 | DMK         | the transport interface          | loads and constructs, plus APDU primitives           | ✅     |
 
-✅ proven under Bare 1.31.0 · ⬜ not yet
+✅ proven under Bare 1.31.0 · ❌ broken under Bare, see 4.1 · ⬜ not yet
 
 Two prerequisites gate everything, and neither requires touching the transport.
 
-### 4.1 Implement `bare-hid`
+### 4.1 The native addons (revised twice)
 
-The reason for this repo's name: no such module exists on npm. Bare builds native addons
-with `bare-make` plus `cmake-bare`, so the options are an addon wrapping `hidapi` (the same
-C library `node-hid` binds) or raw USB interrupt transfers over a Bare USB addon.
+This section first assumed both native dependencies had to be rewritten as Bare addons. That
+was wrong in one direction and right in another, and the hardware probe settled it.
 
-Define the seam before writing any C. The surface `NodeHidApduSender` and `NodeHidTransport`
-actually consume is short: enumerate, open by path, async read, write, close. Ledger devices
-expose one HID interface with 64 byte reports. Match the `node-hid` shape deliberately and
-the port degrades from a rewrite into an import swap.
+**Bare loads Node-API `.node` addons.** It resolves them by its own convention,
+`<pkg>/prebuilds/<platform>-<arch>/<name>@<version>.node`, rather than prebuildify's
+`<pkg>/prebuilds/<platform group>/node.napi.node`.
 
-Hotplug has no obvious home. Upstream gets attach and detach from `usb`, driving
-`startListeningToConnectionEvents` and the reconnection state machine. If the first version
-cannot deliver events, poll enumeration behind the same observable so the transport cannot
-tell the difference.
+**`usb` works** ([packages/bare-usb/](../packages/bare-usb/)), 6 of 6 tests under Bare 1.31.0.
+Three things had to line up, each with its own failure mode:
+
+| Need | Supplied by | Symptom when missing |
+| --- | --- | --- |
+| `util`, `events` | `bare-node-runtime/imports` | `MODULE_NOT_FOUND: util` |
+| `process` | `bare-node-runtime/global` | `process is not defined` |
+| the addon binary | `scripts/link-addon.js` | `ADDON_NOT_FOUND` |
+
+The link step copies the shipped prebuild to the path Bare searches. It runs on `postinstall`,
+is idempotent, and leaves the original alone so Node keeps loading it through `node-gyp-build`.
+
+**`node-hid` loads with no link step**, and under Bare `devices()` returns the same 31 entries
+as Node, `devicesAsync()` agrees, `getHidapiVersion()` reports 0.15.0.
+
+**But it cannot read.** Against an attached Nano X, probed in
+[test/hardware.test.js](../packages/device-transport-kit-node-hid/test/hardware.test.js):
+
+| Step | Bare 1.31.0 | Node 24 |
+| --- | --- | --- |
+| enumerate | 31 devices | 31 devices |
+| `HIDAsync.open(path)` | ok | ok |
+| `write(report)` | returns 65 | returns 65 |
+| `read(2000)` | 64 bytes, **all zero** | 64 bytes, the real frame |
+
+The device does answer, since a full frame comes back rather than a timeout. The content is
+lost on the way out of the addon. node-hid returns read data through
+`Napi::Buffer<unsigned char>::Copy`, that is `napi_create_buffer_copy`, in `src/read.cc:47`,
+and under Bare that produces a correctly sized buffer of zeros. Strings and numbers cross the
+same boundary intact: `getDeviceInfo()` returns `product: 'Nano X'`, `manufacturer: 'Ledger'`.
+So this is one specific N-API path, not addon support in general.
+
+Two consequences:
+
+1. **The transport cannot work under Bare today**, however well everything above it runs. Every
+   APDU response would be zeros.
+2. **`bare-hid` is still needed**, but for a smaller reason than assumed. Not because Bare
+   cannot host hidapi, it evidently can, but because one buffer copy in Bare's N-API layer
+   loses data. The cheapest fixes, in order: report it upstream to Bare; or have the addon
+   return data through a path Bare handles correctly, e.g. writing into a caller supplied
+   `Uint8Array`; and only then write a Bare native addon from scratch.
+
+The hardware test pins the defect rather than asserting the fix, so when Bare corrects the copy
+the test fails and this section flips.
+
+Hotplug, at least, needs no substitute: `usb`'s listeners work under Bare, and where libusb
+lacks hotplug support the package already falls back to polling `getDeviceList` and diffing.
 
 ### 4.2 Prove `purify-ts` runs under Bare (done)
 

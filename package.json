@@ -39,5 +39,8 @@
   "overrides": {
     "bare": "$bare",
     "bare-runtime": "1.31.0"
+  },
+  "imports": {
+    "~/*": "./node_modules/*"
   }
 }
