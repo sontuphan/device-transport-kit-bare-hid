@@ -11,7 +11,8 @@
     "start": "npm run build && tsx index.js",
     "dev": "npm run build && tsx watch index.js",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "test:hardware": "npm run test:hardware --workspaces --if-present"
   },
   "keywords": [
     "bare",

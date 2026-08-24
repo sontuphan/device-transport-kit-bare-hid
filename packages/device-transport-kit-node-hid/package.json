@@ -18,7 +18,9 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "noba-bare test/*.test.js"
+    "test": "noba-bare test/*.test.js",
+    "hardware:node": "node scripts/hardware-node.js",
+    "test:hardware": "noba-bare test/hardware/*.test.js"
   },
   "dependencies": {
     "@tetherto/uuid": "*",

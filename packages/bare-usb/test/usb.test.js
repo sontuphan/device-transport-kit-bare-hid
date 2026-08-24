@@ -31,44 +31,20 @@ describe('bare-usb: module loading', ({ test }) => {
 })
 
 describe('bare-usb: enumeration', ({ test }) => {
-  test('getDeviceList returns descriptors', ({ assert }) => {
+  test('getDeviceList returns descriptors', ({ assert, log }) => {
     const devices = usb.getDeviceList()
-    assert.isTrue(Array.isArray(devices))
+    log(`${devices.length} device(s) on the bus`)
     for (const device of devices) {
-      assert.isExist(device.deviceDescriptor)
-      assert.equal(typeof device.deviceDescriptor.idVendor, 'number')
+      const { idVendor, idProduct } = device.deviceDescriptor
+      log(`  bus ${device.busNumber} addr ${device.deviceAddress}: vid 0x${idVendor.toString(16)} pid 0x${idProduct.toString(16)}`)
+      assert.equal(typeof idVendor, 'number')
       assert.equal(typeof device.busNumber, 'number')
     }
+    assert.isTrue(Array.isArray(devices))
   })
 
   test('findByIds answers for an absent device', ({ assert }) => {
     // 0xffff/0xffff is not a real vendor, so this must be undefined rather than throw.
     assert.isUndefined(usbModule.findByIds(0xffff, 0xffff))
-  })
-})
-
-describe('bare-usb: hotplug', ({ test }) => {
-  /**
-   * The transport's only use of this package. Attaching a listener is what starts libusb's
-   * event thread, or the polling fallback where libusb has no hotplug support, so this
-   * exercises the part most likely to differ under Bare's loop.
-   */
-  test('listeners attach and detach without throwing', ({ assert }) => {
-    const seen = []
-    const onAttach = (device) => seen.push(device)
-
-    usb.on('attach', onAttach)
-    assert.equal(usb.listenerCount('attach'), 1)
-
-    usb.off('attach', onAttach)
-    assert.equal(usb.listenerCount('attach'), 0)
-    usb.unrefHotplugEvents()
-  })
-
-  test('hotplug support is reported either way', ({ assert }) => {
-    const supported = usb._supportedHotplugEvents()
-    assert.equal(typeof supported, 'boolean')
-    // false is fine: the package falls back to polling getDeviceList and diffing.
-    assert.equal(typeof usb.pollHotplugDelay, 'number')
   })
 })

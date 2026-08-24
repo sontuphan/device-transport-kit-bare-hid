@@ -12,11 +12,14 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "postinstall": "node scripts/link-addon.js",
     "build": "tsup",
-    "test": "noba-bare test/*.test.js"
+    "test": "noba-bare test/*.test.js",
+    "test:hardware": "noba-bare test/hardware/*.test.js"
   },
   "dependencies": {
     "usb": "^2.16.0"
