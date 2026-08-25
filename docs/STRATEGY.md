@@ -80,8 +80,8 @@ Six externals, sorted by how much work Bare makes them:
 
 | Dependency  | Used for                         | Bare status                                          | Result |
 | ----------- | -------------------------------- | ---------------------------------------------------- | ------ |
-| `node-hid`  | every HID read and write         | enumerates and writes, reads come back zeroed                       | ❌     |
-| `usb`       | attach and detach events         | runs unchanged, via `@tetherto/bare-usb`                    | ✅     |
+| `node-hid`  | every HID read and write         | enumerates and writes, reads come back zeroed        | ❌     |
+| `usb`       | attach and detach events         | runs unchanged, via `@tetherto/bare-usb`             | ✅     |
 | `purify-ts` | `Either` / `EitherAsync` results | runs unchanged, all 38 exports probed                | ✅     |
 | `rxjs`      | observables across the DMK       | runs unchanged, timers and interop included          | ✅     |
 | `uuid`      | device and session ids           | needs Bare's import map, wrapped in `@tetherto/uuid` | ✅     |
@@ -103,11 +103,11 @@ was wrong in one direction and right in another, and the hardware probe settled 
 **`usb` works** ([packages/bare-usb/](../packages/bare-usb/)), 6 of 6 tests under Bare 1.31.0.
 Three things had to line up, each with its own failure mode:
 
-| Need | Supplied by | Symptom when missing |
-| --- | --- | --- |
+| Need             | Supplied by                 | Symptom when missing     |
+| ---------------- | --------------------------- | ------------------------ |
 | `util`, `events` | `bare-node-runtime/imports` | `MODULE_NOT_FOUND: util` |
-| `process` | `bare-node-runtime/global` | `process is not defined` |
-| the addon binary | `scripts/link-addon.js` | `ADDON_NOT_FOUND` |
+| `process`        | `bare-node-runtime/global`  | `process is not defined` |
+| the addon binary | `scripts/link-addon.js`     | `ADDON_NOT_FOUND`        |
 
 The link step copies the shipped prebuild to the path Bare searches. It runs on `postinstall`,
 is idempotent, and leaves the original alone so Node keeps loading it through `node-gyp-build`.
@@ -118,12 +118,12 @@ as Node, `devicesAsync()` agrees, `getHidapiVersion()` reports 0.15.0.
 **But it cannot read.** Against an attached Nano X, probed in
 [test/hardware.test.js](../packages/device-transport-kit-node-hid/test/hardware.test.js):
 
-| Step | Bare 1.31.0 | Node 24 |
-| --- | --- | --- |
-| enumerate | 31 devices | 31 devices |
-| `HIDAsync.open(path)` | ok | ok |
-| `write(report)` | returns 65 | returns 65 |
-| `read(2000)` | 64 bytes, **all zero** | 64 bytes, the real frame |
+| Step                  | Bare 1.31.0            | Node 24                  |
+| --------------------- | ---------------------- | ------------------------ |
+| enumerate             | 31 devices             | 31 devices               |
+| `HIDAsync.open(path)` | ok                     | ok                       |
+| `write(report)`       | returns 65             | returns 65               |
+| `read(2000)`          | 64 bytes, **all zero** | 64 bytes, the real frame |
 
 The device does answer, since a full frame comes back rather than a timeout. The content is
 lost on the way out of the addon. node-hid returns read data through

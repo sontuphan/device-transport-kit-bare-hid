@@ -1,0 +1,12 @@
+.DS_Store
+build/
+node_modules
+npm-debug.log
+Release/
+prebuilds/
+*.tgz
+yarn.lock
+package-lock.json
+*.log
+scratch/
+.vscode/
