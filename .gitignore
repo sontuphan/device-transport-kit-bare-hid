@@ -1,4 +1,6 @@
 node_modules/
 dist/
 packages/*/dist/
+packages/*/build/
+packages/bare-hid/prebuilds
 .DS_Store

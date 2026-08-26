@@ -1,6 +1,9 @@
 
+// Upstream, unchanged. package.json maps `events` to ./events-bare.js under Bare, which
+// re-exports bare-events and installs the Node compatible globals, so the `process` reads
+// further down work as they do on Node. Upstream also imported `util`, for `util.inherits`;
+// the class below no longer needs it.
 const EventEmitter = require("events").EventEmitter;
-const util = require("util");
 
 let driverType = null;
 function setDriverType(type) {
@@ -15,22 +18,20 @@ function loadBinding() {
         if (process.platform === "linux" && (!driverType || driverType === "hidraw")) {
             options.name = 'HID_hidraw';
         }
+        // Mapped to ./bindings-bare.js under Bare, since pkg-prebuilds reaches for `path`
+        // and `os` itself; see package.json imports.
         binding = require("pkg-prebuilds/bindings")(__dirname, options);
     }
 }
 
 //This class is a wrapper for `binding.HID` class
-function HID() {
-
-    // see issue #150 (enhancement, solves issue #149)
-    // throw an error for those who forget to instantiate, i.e. by "*new* HID.HID()"
-    // and who would otherwise be left trying to figure out why "self.on is not a function"
-    if (!new.target) {
-        throw new Error('HID() must be called with \'new\' operator');
-    }
-
-    //Inherit from EventEmitter
-    EventEmitter.call(this);
+class HID extends EventEmitter {
+  constructor() {
+    // Was `function HID()` with `EventEmitter.call(this)` and `util.inherits`. bare-events is
+    // a class, which cannot be called as a function, so this uses class syntax instead.
+    // `new.target` is implicit: a class throws on its own if called without `new`, which is
+    // what the old guard did by hand.
+    super();
 
     loadBinding();
 
@@ -65,9 +66,8 @@ function HID() {
         if(eventName == "data")
             process.nextTick(self.resume.bind(self) );
     });
+  }
 }
-//Inherit prototype methods
-util.inherits(HID, EventEmitter);
 //Don't inherit from `binding.HID`; that's done above already!
 
 HID.prototype.close = function close() {

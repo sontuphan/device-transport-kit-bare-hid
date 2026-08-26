@@ -57,5 +57,15 @@
     "LICENSE*",
     "README.md",
     "binding.gyp"
-  ]
+  ],
+  "exports": {
+    ".": {
+      "types": "./nodehid.d.ts",
+      "bare": "./bare.mjs",
+      "default": "./nodehid.js"
+    },
+    "./package": {
+      "default": "./package.json"
+    }
+  }
 }
