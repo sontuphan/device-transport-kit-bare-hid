@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@ledgerhq/device-management-kit": "^1.8.0",
+    "@tetherto/bare-hid": "*",
     "bare-node-runtime": "^1.5.0",
     "noba": "^1.6.4",
     "rxjs": "7.8.2",

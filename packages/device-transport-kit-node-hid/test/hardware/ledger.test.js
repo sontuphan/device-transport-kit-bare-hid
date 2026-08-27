@@ -1,10 +1,5 @@
 import { describe } from 'noba'
-import 'bare-node-runtime/global'
-
-const nodeHid = await import('~/node-hid/nodehid.js', {
-  with: { imports: 'bare-node-runtime/imports' },
-})
-const hid = nodeHid.default ?? nodeHid
+import * as hid from '@tetherto/bare-hid'
 
 /**
  * Hardware suite: `npm run test:hardware`. REQUIRES an attached, unlocked Ledger and fails

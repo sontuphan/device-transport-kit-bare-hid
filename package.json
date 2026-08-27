@@ -5,8 +5,7 @@
   "type": "module",
   "main": "index.js",
   "workspaces": [
-    "packages/*",
-    "!packages/bare-hid"
+    "packages/*"
   ],
   "scripts": {
     "start": "npm run build && tsx index.js",

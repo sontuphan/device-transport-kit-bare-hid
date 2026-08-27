@@ -1,8 +1,12 @@
 # How node-hid fits together
 
-Read from the vendored v3.4.0 tree: `nodehid.js`, `binding-options.js`, `src/*.cc`,
-`src/*.h`, `binding.gyp`. Annotated with what Bare does and does not survive; see
-[PORTING.md](./PORTING.md) for the evidence.
+Read from node-hid v3.4.0 as installed at `node_modules/node-hid`: `nodehid.js`,
+`binding-options.js`, `src/*.cc`, `src/*.h`, `binding.gyp`. Annotated with what Bare does and
+does not survive; see [PORTING.md](./PORTING.md) for the evidence.
+
+This package adds nothing to the stack below. It sits above `nodehid.js` as a two line entry
+point, [bare.js](./bare.js), selected by the `bare` export condition, and everything in the
+diagrams is upstream.
 
 ## The stack
 
@@ -104,7 +108,9 @@ flowchart LR
   end
 ```
 
-Two failures, both narrow. The buffer copy is a libnapi defect rather than a node-hid one:
-Bare's Node-API support is `holepunchto/libnapi` layered over `libjs`, so
-`napi_create_buffer_copy` is the single function to look at. The `EventEmitter.call(this)`
+Two failures, both narrow. The buffer copy was a libnapi defect rather than a node-hid one:
+Bare's Node-API support is `holepunchto/libnapi` layered over `libjs`, and
+`napi_create_buffer_copy` was the single function at fault. It is fixed upstream at
+[libnapi@b4c5a66](https://github.com/holepunchto/libnapi/commit/b4c5a66) and reaches Bare when
+`bare/CMakeLists.txt:184` moves off its `#60e6881` pin. The `EventEmitter.call(this)`
 break only affects the synchronous `HID` class, which the transport never uses.

@@ -134,16 +134,23 @@ So this is one specific N-API path, not addon support in general.
 
 Two consequences:
 
-1. **The transport cannot work under Bare today**, however well everything above it runs. Every
-   APDU response would be zeros.
-2. **`bare-hid` is still needed**, but for a smaller reason than assumed. Not because Bare
-   cannot host hidapi, it evidently can, but because one buffer copy in Bare's N-API layer
-   loses data. The cheapest fixes, in order: report it upstream to Bare; or have the addon
-   return data through a path Bare handles correctly, e.g. writing into a caller supplied
-   `Uint8Array`; and only then write a Bare native addon from scratch.
+1. **The transport cannot work under Bare until Bare ships the fix**, however well everything
+   above it runs. Every APDU response would be zeros.
+2. **`bare-hid` is a wrapper, not a fork.** The defect was one function in libnapi, Bare's
+   Node-API layer, which read `napi_create_buffer_copy`'s `result_data` as the destination
+   rather than as an optional out-parameter. `Napi::Buffer::Copy` always passes `nullptr`
+   there, so the copy was skipped and the buffer came back zeroed. Fixed upstream in
+   [libnapi@b4c5a66](https://github.com/holepunchto/libnapi/commit/b4c5a66); it reaches Bare
+   when `bare/CMakeLists.txt:184` moves off its `#60e6881` pin and a release goes out.
 
-The hardware test pins the defect rather than asserting the fix, so when Bare corrects the copy
-the test fails and this section flips.
+So nothing about node-hid needed porting. [packages/bare-hid/](../packages/bare-hid/) consumes
+the stock npm package and only resolves a per-runtime entry point, the same shape as `bare-usb`
+minus the addon link step. 5 of 5 tests pass under Bare 1.31.2. The one thing it cannot fix from
+outside is the synchronous `HID` class, whose `EventEmitter.call(this)` cannot work against a
+class emitter; the transport uses `HIDAsync` only.
+
+The hardware test pins the defect rather than asserting the fix, so when the pin bump lands the
+test fails and this section flips.
 
 Hotplug, at least, needs no substitute: `usb`'s listeners work under Bare, and where libusb
 lacks hotplug support the package already falls back to polling `getDeviceList` and diffing.
