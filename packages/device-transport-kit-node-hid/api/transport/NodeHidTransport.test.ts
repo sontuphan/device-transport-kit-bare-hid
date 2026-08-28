@@ -18,7 +18,7 @@ import {
   type TransportDiscoveredDevice,
   UnknownDeviceError,
 } from "@ledgerhq/device-management-kit";
-import type { Device as NodeHIDDevice } from "node-hid";
+import type { Device as NodeHIDDevice } from "@tetherto/bare-hid";
 import { Left, Right } from "purify-ts";
 import { lastValueFrom, toArray } from "rxjs";
 
@@ -33,7 +33,7 @@ import { NodeHidTransport } from "./NodeHidTransport";
 
 // Mock node-hid module
 const mockDevicesAsync = vi.fn();
-vi.mock("node-hid", () => ({
+vi.mock("@tetherto/bare-hid", () => ({
   devicesAsync: (...args: unknown[]) => mockDevicesAsync(...args),
   HIDAsync: {
     open: vi.fn(),
@@ -45,7 +45,7 @@ const mockUsbOn = vi.fn();
 const mockUsbAttachCallbacks: ((device: unknown) => void)[] = [];
 const mockUsbDetachCallbacks: ((device: unknown) => void)[] = [];
 
-vi.mock("usb", () => ({
+vi.mock("@tetherto/bare-usb", () => ({
   usb: {
     on: (event: string, callback: (device: unknown) => void) => {
       mockUsbOn(event, callback);

@@ -4,7 +4,7 @@ import {
   OpeningConnectionError,
   SendApduTimeoutError,
 } from "@ledgerhq/device-management-kit";
-import type { Device as NodeHIDDevice, HIDAsync } from "node-hid";
+import type { Device as NodeHIDDevice, HIDAsync } from "@tetherto/bare-hid";
 import { Left, Maybe, Right } from "purify-ts";
 
 import { NodeHidSendReportError } from "../model/Errors";
@@ -13,7 +13,7 @@ import { nodeHidDeviceStubBuilder } from "../model/HIDDevice.stub";
 import { NodeHidApduSender } from "./NodeHidApduSender";
 
 // Mock HIDAsync.open static method
-vi.mock("node-hid", () => ({
+vi.mock("@tetherto/bare-hid", () => ({
   HIDAsync: {
     open: vi.fn(),
   },
@@ -66,7 +66,7 @@ describe("NodeHidApduSender", () => {
     };
 
     // Mock HIDAsync.open to return our mock instance
-    const { HIDAsync } = await import("node-hid");
+    const { HIDAsync } = await import("@tetherto/bare-hid");
     vi.mocked(HIDAsync.open).mockResolvedValue(
       mockHidAsync as unknown as HIDAsync,
     );
@@ -108,7 +108,7 @@ describe("NodeHidApduSender", () => {
   });
 
   it("should setup connection", async () => {
-    const { HIDAsync } = await import("node-hid");
+    const { HIDAsync } = await import("@tetherto/bare-hid");
 
     const setupPromise = nodeHidApduSender.setupConnection();
     await vi.advanceTimersByTimeAsync(300);
@@ -135,7 +135,7 @@ describe("NodeHidApduSender", () => {
 
   it("should handle setup connection error", async () => {
     const error = new Error("Failed to open device");
-    const { HIDAsync } = await import("node-hid");
+    const { HIDAsync } = await import("@tetherto/bare-hid");
     vi.mocked(HIDAsync.open).mockRejectedValue(error);
 
     // Capture the promise and its rejection handler immediately
@@ -161,7 +161,7 @@ describe("NodeHidApduSender", () => {
       close: vi.fn().mockResolvedValue(undefined),
     };
 
-    const { HIDAsync } = await import("node-hid");
+    const { HIDAsync } = await import("@tetherto/bare-hid");
     vi.mocked(HIDAsync.open).mockResolvedValue(
       secondMockHidAsync as unknown as HIDAsync,
     );

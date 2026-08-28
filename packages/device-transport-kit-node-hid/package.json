@@ -8,6 +8,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "bare": "./dist/bare.js",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
@@ -23,15 +24,15 @@
     "test:hardware": "noba-bare test/hardware/*.test.js"
   },
   "dependencies": {
+    "@tetherto/bare-hid": "*",
+    "@tetherto/bare-usb": "*",
     "@tetherto/uuid": "*",
-    "node-hid": "^3.2.0",
-    "purify-ts": "2.1.0",
-    "usb": "^2.16.0"
+    "purify-ts": "2.1.0"
   },
   "devDependencies": {
     "@ledgerhq/device-management-kit": "^1.8.0",
-    "@tetherto/bare-hid": "*",
     "bare-node-runtime": "^1.5.0",
+    "node-hid": "^3.2.0",
     "noba": "^1.6.4",
     "rxjs": "7.8.2",
     "tsup": "^8.5.1"

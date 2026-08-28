@@ -34,7 +34,7 @@ What was deliberately not copied, since it is monorepo tooling:
 
 `@types/uuid` is not installed: it is deprecated, since `uuid@11` ships its own types.
 
-Two edits to `src/`, both mechanical to reapply after a rebase:
+Three edits to `src/`, all mechanical to reapply after a rebase:
 
 1. Upstream's `@api/*` path alias was rewritten to relative imports, so the tree resolves
    without any tsconfig `paths` entry.
@@ -42,3 +42,18 @@ Two edits to `src/`, both mechanical to reapply after a rebase:
    picks uuid's Bare safe build under Bare and the plain one elsewhere; see
    [../../docs/STRATEGY.md](../../docs/STRATEGY.md) section 4.2d. its own `tsup.config.ts` keeps it external,
    otherwise the bundle inlines the non Bare branch.
+3. The same treatment for the two native dependencies: `node-hid` becomes `@tetherto/bare-hid`
+   and `usb` becomes `@tetherto/bare-usb`, in `NodeHidApduSender.ts`, `NodeHidTransport.ts` and
+   `model/HIDDevice.stub.ts`. Both wrappers are external in `tsup.config.ts` for the reason
+   above. The upstream `*.test.ts` files had their `vi.mock` targets moved to match, or they
+   would mock a module the source no longer imports. `scripts/hardware-node.js` deliberately
+   keeps importing `node-hid` directly, since its whole purpose is to be the Node baseline,
+   which is why `node-hid` stays a devDependency.
+
+Outside `src/`, the package gained a Bare entry point, following the same dual entry pattern as
+the three wrappers: `bare.js`, selected by a `bare` condition in `exports`, installing
+`bare-node-runtime`'s globals and applying its import map to everything below `./index.js`. It is
+copied into `dist/` verbatim by `tsup.config.ts`, since esbuild cannot carry
+`with { imports: ... }` into CJS. Node never sees it and gets `./dist/index.js` directly.
+`Module.resolve` confirms Bare selects `dist/bare.js`; it cannot yet be observed doing its job,
+for the reason in [PORTING.md](./PORTING.md) section 2.

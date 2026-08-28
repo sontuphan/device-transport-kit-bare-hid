@@ -14,7 +14,7 @@ import {
   type SendApduResult,
   SendApduTimeoutError,
 } from "@ledgerhq/device-management-kit";
-import { type Device as NodeHIDDevice, HIDAsync } from "node-hid";
+import { type Device as NodeHIDDevice, HIDAsync } from "@tetherto/bare-hid";
 import { type Either, Just, Left, Maybe, Nothing, Right } from "purify-ts";
 
 import { FRAME_SIZE } from "../data/NodeHidConfig";

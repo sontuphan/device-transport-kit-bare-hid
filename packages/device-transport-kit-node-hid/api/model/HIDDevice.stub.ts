@@ -1,4 +1,4 @@
-import type { Device as NodeHIDDevice } from "node-hid";
+import type { Device as NodeHIDDevice } from "@tetherto/bare-hid";
 
 export const nodeHidDeviceStubBuilder = (
   props: Partial<NodeHIDDevice> = {},

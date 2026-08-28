@@ -22,7 +22,7 @@ import {
   type TransportIdentifier,
   UnknownDeviceError,
 } from '@ledgerhq/device-management-kit'
-import { type Device as NodeHIDDevice, devicesAsync, HIDAsync } from 'node-hid'
+import { type Device as NodeHIDDevice, devicesAsync, HIDAsync } from '@tetherto/bare-hid'
 import {
   type Either,
   EitherAsync,
@@ -33,7 +33,7 @@ import {
   Right,
 } from 'purify-ts'
 import { BehaviorSubject, from, map, type Observable, switchMap } from 'rxjs'
-import { type Device, usb } from 'usb'
+import { type Device, usb } from '@tetherto/bare-usb'
 import { v4 as uuid } from '@tetherto/uuid'
 
 import { RECONNECT_DEVICE_TIMEOUT } from '../data/NodeHidConfig'

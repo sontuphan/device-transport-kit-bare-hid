@@ -9,7 +9,10 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  // Keep the wrapper external. Bundled, esbuild would inline its `default` branch and the
+  // Keep the wrappers external. Bundled, esbuild would inline their `default` branch and the
   // `bare` condition would never be evaluated at runtime.
-  external: ['@tetherto/uuid'],
+  external: ['@tetherto/bare-hid', '@tetherto/bare-usb', '@tetherto/uuid'],
+  // esbuild cannot carry `with { imports: ... }` into every target or into CJS, and bare.js
+  // needs no compiling, so copy it through verbatim.
+  onSuccess: 'cp bare.js dist/bare.js',
 })

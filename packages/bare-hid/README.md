@@ -35,7 +35,7 @@ const handle = await HIDAsync.open(device.path)
 
 ## What works, and what does not
 
-Verified under Bare 1.31.2 by `npm test`, five tests, all passing: enumeration through both
+Verified under Bare 1.31.0 by `npm test`, five tests, all passing: enumeration through both
 `devices()` and `devicesAsync()`, `getHidapiVersion()` reaching into the binding, and the
 documented export surface.
 

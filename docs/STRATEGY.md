@@ -145,7 +145,7 @@ Two consequences:
 
 So nothing about node-hid needed porting. [packages/bare-hid/](../packages/bare-hid/) consumes
 the stock npm package and only resolves a per-runtime entry point, the same shape as `bare-usb`
-minus the addon link step. 5 of 5 tests pass under Bare 1.31.2. The one thing it cannot fix from
+minus the addon link step. 5 of 5 tests pass under Bare 1.31.0. The one thing it cannot fix from
 outside is the synchronous `HID` class, whose `EventEmitter.call(this)` cannot work against a
 class emitter; the transport uses `HIDAsync` only.
 
