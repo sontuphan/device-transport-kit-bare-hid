@@ -8,10 +8,12 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "npm run build && tsx index.js",
-    "dev": "npm run build && tsx watch index.js",
+    "start": "npm run build && bare dist/bare.js",
+    "start:node": "npm run build:packages && tsx index.js",
+    "dev": "npm run build:packages && tsup --watch",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build:packages && tsup",
+    "build:packages": "npm run build --workspaces --if-present",
     "test:hardware": "npm run test:hardware --workspaces --if-present"
   },
   "keywords": [
